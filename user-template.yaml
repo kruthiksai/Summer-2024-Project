@@ -1,0 +1,253 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: AWS CloudFormation Template for Login and Registarion of User.
+
+Parameters:
+  CodeBucketName:
+    Type: String
+    Description: Enter the name of the S3 bucket where Lambda code is store
+  Filename:
+    Type: String
+    Description: Enter the name of the File to be picked for the code
+  UserTableName:
+    Type: String
+    Description: Enter the name of the DynamoDB table for user data
+  StageName:
+    Type: String
+    Description: Enter the name of the API Gateway stage
+
+Resources:
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${StageName}-${UserTableName}"
+      AttributeDefinitions:
+        - AttributeName: email
+          AttributeType: S
+      KeySchema:
+        - AttributeName: email
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+
+  UserRegisterFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${StageName}-UserRegisterFunctionRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: RegisterFunctionPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - s3:GetObject
+                  - dynamodb:PutItem
+                  - dynamodb:Scan
+                  - dynamodb:GetItem
+                Resource: "*"
+
+  UserRegisterFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${StageName}-UserRegisterFunction"
+      Handler: Users.register
+      Role: !GetAtt UserRegisterFunctionRole.Arn
+      Runtime: python3.9
+      Code:
+        S3Bucket: !Ref CodeBucketName
+        S3Key: !Ref Filename
+      Environment:
+        Variables:
+          USER_TABLE_NAME: !Sub "${StageName}-${UserTableName}"
+
+  UserLoginFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${StageName}-UserLoginFunctionRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LoginFunctionPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - s3:GetObject
+                  - dynamodb:GetItem
+                Resource: "*"
+
+  UserLoginFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${StageName}-UserLoginFunction"
+      Handler: Users.login
+      Role: !GetAtt UserLoginFunctionRole.Arn
+      Runtime: python3.9
+      Code:
+        S3Bucket: !Ref CodeBucketName
+        S3Key: !Ref Filename
+      Environment:
+        Variables:
+          USER_TABLE_NAME: !Sub "${StageName}-${UserTableName}"
+
+  APIGatewayRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub "${StageName}-UserAuthenticationAPI"
+
+  APIGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ParentId: !GetAtt APIGatewayRestApi.RootResourceId
+      PathPart: user
+    DependsOn:
+      - APIGatewayRestApi
+
+  APIGatewayResourceRegister:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ParentId: !Ref APIGatewayResource
+      PathPart: register
+
+  APIGatewayResourceLogin:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ParentId: !Ref APIGatewayResource
+      PathPart: login
+
+  RegisterApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ResourceId: !Ref APIGatewayResourceRegister
+      HttpMethod: POST
+      AuthorizationType: NONE
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+            method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserRegisterFunction.Arn}/invocations
+
+  LoginApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ResourceId: !Ref APIGatewayResourceLogin
+      HttpMethod: POST
+      AuthorizationType: NONE
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+            method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserLoginFunction.Arn}/invocations
+
+  OptionsApiMethodRegister:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ResourceId: !Ref APIGatewayResourceRegister
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+            method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{ "statusCode": 200 }'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+
+  OptionsApiMethodLogin:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ResourceId: !Ref APIGatewayResourceLogin
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+            method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{ "statusCode": 200 }'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+
+  APIGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      StageName: !Ref StageName
+    DependsOn:
+      - RegisterApiMethod
+      - LoginApiMethod
+      - OptionsApiMethodLogin
+      - OptionsApiMethodRegister
+    
+  RegisterPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref UserRegisterFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+
+  LoginPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref UserLoginFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+
+Outputs:
+  ApiGatewayInvokeURL:
+    Description: URL for invoking the API Gateway
+    Value: !Sub https://${APIGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}

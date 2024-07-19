@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css">
+    <title>Registration</title>
+
+</head>
+
+<body>
+    <div class="container py-5 h-100">
+        <div class="row d-flex justify-content-center align-items-center h-100">
+            <div class="col-xl-10">
+                <div class="card rounded-3 text-black">
+                    <div class="row g-0">
+                        <div class="col-lg-6">
+                            <div class="card-body p-md-5 mx-md-4">
+
+                                <div class="text-center">
+                                    <img src="data:image/png;base64,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"
+                                        style="width: 185px;" alt="logo">
+                                    <h4 class="mt-1 mb-5 pb-1">H_20242_CIS_4355_11133</h4>
+                                </div>
+
+                                <form id="registrationForm">
+                                    <!-- Registration form fields -->
+                                    <div class="form-outline mb-4">
+                                        <input type="text" id="psid" class="form-control"
+                                            placeholder="PSID" />
+                                    </div>
+                                    
+                                    <div class="form-outline mb-4">
+                                        <input type="text" id="name" class="form-control"
+                                            placeholder="name" />
+                                    </div>
+
+                                    <div class="form-outline mb-4">
+                                        <input type="email" id="email" class="form-control"
+                                            placeholder="Email Address" />
+                                        <div class="error-message" id="email-error-message"></div>
+                                    </div>
+
+                                    <div class="form-outline mb-4">
+                                        <input type="password" id="password" class="form-control"
+                                            placeholder="Password" />
+                                        <div class="error-message" id="password-error-message"></div>
+                                    </div>
+
+                                    <!-- End of registration form fields -->
+
+                                    <div class="text-center pt-1 mb-4 pb-1">
+                                        <button class="btn btn-primary btn-block fa-lg purplecolor mb-3" type="button"
+                                            onclick="register()">Register</button>
+                                        </br>
+                                        <a class="text-muted" href="login.html">Already have an account? Login</a>
+                                    </div>
+                                </form>
+
+                            </div>
+                        </div>
+                        <div class="col-lg-6 d-flex align-items-center purplecolor">
+                            <div class="text-white px-3 py-4 p-md-5 mx-md-4">
+                                <h4 class="mb-4">Post your question and get your doubts clarified</h4>
+                                <p class="small mb-0">
+                                <p class="small mb-0 pt-2">
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
+        crossorigin="anonymous"></script>
+    <script>
+        const apiUrl = "https://doch9oczi8.execute-api.us-east-1.amazonaws.com/test"
+        function register() {
+            document.getElementById('email-error-message').textContent = '';
+            document.getElementById('password-error-message').textContent = '';
+
+        
+            const psid = document.getElementById('psid').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const name = document.getElementById('name').value.trim();
+
+        
+
+            if (!psid) {
+                alert('psid is required.');
+                return;
+            }
+            
+            if (!name) {
+                alert('name is required.');
+                return;
+            }
+
+            if (!email) {
+                document.getElementById('email-error-message').textContent = 'Email is required.';
+                return;
+            } else if (!validateEmail(email)) {
+                document.getElementById('email-error-message').textContent = 'Invalid email format.';
+                return;
+            }
+
+            if (!password) {
+                document.getElementById('password-error-message').textContent = 'Password is required.';
+                return;
+            }
+
+            console.log(JSON.stringify({
+                    psid,
+                    name,
+                    email,
+                    password
+                }))
+            fetch(`${apiUrl}/user/register`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    psid,
+                    name,
+                    email,
+                    password
+                }),
+            })
+                .then(response => {
+                    if (response.ok) {
+                        // Registration successful, handle accordingly (redirect, show message, etc.)
+                        
+                        window.location.href = "login.html";
+                    } else {
+                        // Handle registration error
+                        alert('Registration failed');
+                    }
+                })
+                .catch(error => {
+                    alert('Error during registration request:', error);
+                });
+        }
+
+        function validateEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
+    </script>
+</body>
+
+</html>

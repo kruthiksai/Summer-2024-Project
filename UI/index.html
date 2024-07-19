@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Question and Answer System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+
+<body>
+    <div class="logout-container">
+        <button id="logoutButton" class="btn btn-danger">Logout</button>
+    </div>
+    
+    <div class="container mt-5">
+        <!-- Loading Spinner -->
+        <div id="spinner" class="spinner-overlay" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+
+        <!-- Logout Button -->
+
+
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h2 class="card-title">Post a Question</h2>
+                        <form id="questionForm">
+                            <div class="mb-3">
+                                <label for="questionBody" class="form-label">Question:</label>
+                                <textarea class="form-control" id="questionBody" name="body" rows="3"
+                                    required></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="questionImage" class="form-label">Attach an image:</label>
+                                <input type="file" class="form-control" id="questionImage" name="image"
+                                    accept="image/*">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Post Question</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h2 class="card-title">Questions Asked</h2>
+                        <ul id="questionsList" class="list-group">
+                            <!-- Questions will be dynamically added here -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="scripts.js"></script>
+</body>
+
+</html>

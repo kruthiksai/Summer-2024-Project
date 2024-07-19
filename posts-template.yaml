@@ -1,0 +1,488 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: AWS CloudFormation Template for Question and Answer System with Image Upload
+
+Parameters:
+  CodeBucketName:
+    Type: String
+    Description: Name of the S3 bucket where Lambda code is stored
+  Filename:
+    Type: String
+    Description: Name of the Lambda function deployment package
+  QuestionTableName:
+    Type: String
+    Description: Name of the DynamoDB table for questions and answers
+  ImageBucketName:
+    Type: String
+    Description: Name of the S3 bucket for storing images
+  StageName:
+    Type: String
+    Description: Name of the API Gateway stage (e.g., dev, prod)
+
+Resources:
+  QuestionTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${StageName}-${QuestionTableName}"
+      AttributeDefinitions:
+        - AttributeName: question_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: question_id
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+
+  PostQuestionFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: PostQuestionFunctionPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - s3:PutObject
+                Resource: "*"
+
+  PostQuestionFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${StageName}-PostQuestionFunction"
+      Handler: post_questions.post_question
+      Role: !GetAtt PostQuestionFunctionRole.Arn
+      Runtime: python3.9
+      Code:
+        S3Bucket: !Ref CodeBucketName
+        S3Key: !Ref Filename
+      Environment:
+        Variables:
+          QUESTION_TABLE_NAME: !Sub "${StageName}-${QuestionTableName}"
+          IMAGE_BUCKET_NAME: !Ref ImageBucketName
+
+  AnswerQuestionFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AnswerQuestionFunctionPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                Resource: "*"
+
+  AnswerQuestionFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${StageName}-AnswerQuestionFunction"
+      Handler: answer_questions.answer_question
+      Role: !GetAtt AnswerQuestionFunctionRole.Arn
+      Runtime: python3.9
+      Code:
+        S3Bucket: !Ref CodeBucketName
+        S3Key: !Ref Filename
+      Environment:
+        Variables:
+          QUESTION_TABLE_NAME: !Sub "${StageName}-${QuestionTableName}"
+
+  GetAllQuestionsFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: GetAllQuestionsFunctionPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - dynamodb:Scan
+                Resource: "*"
+
+  GetAllQuestionsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${StageName}-GetAllQuestionsFunction"
+      Handler: all_questions.all_question
+      Role: !GetAtt GetAllQuestionsFunctionRole.Arn
+      Runtime: python3.9
+      Code:
+        S3Bucket: !Ref CodeBucketName
+        S3Key: !Ref Filename
+      Environment:
+        Variables:
+          QUESTION_TABLE_NAME: !Sub "${StageName}-${QuestionTableName}"
+
+  DeleteQuestionFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DeleteQuestionFunctionPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - dynamodb:GetItem
+                  - dynamodb:DeleteItem
+                Resource: "*"
+
+  DeleteQuestionFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${StageName}-DeleteQuestionFunction"
+      Handler: delete_questions.delete_question
+      Role: !GetAtt DeleteQuestionFunctionRole.Arn
+      Runtime: python3.9
+      Code:
+        S3Bucket: !Ref CodeBucketName
+        S3Key: !Ref Filename
+      Environment:
+        Variables:
+          QUESTION_TABLE_NAME: !Sub "${StageName}-${QuestionTableName}"
+
+  APIGatewayRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub "${StageName}-QuestionAnswerAPI"
+
+  APIGatewayResourceQuestions:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ParentId: !GetAtt APIGatewayRestApi.RootResourceId
+      PathPart: questions
+
+  APIGatewayResourceAnswers:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ParentId: !GetAtt APIGatewayRestApi.RootResourceId
+      PathPart: answers
+
+  APIGatewayResourceGetAllQuestions:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ParentId: !GetAtt APIGatewayRestApi.RootResourceId
+      PathPart: allquestions
+
+  APIGatewayResourceQuestionId:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ParentId: !GetAtt APIGatewayRestApi.RootResourceId
+      PathPart: delete
+
+
+    
+  PostQuestionApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ResourceId: !Ref APIGatewayResourceQuestions
+      HttpMethod: POST
+      AuthorizationType: NONE
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+            method.response.header.Access-Control-Allow-Methods: "'OPTIONS,POST'"
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PostQuestionFunction.Arn}/invocations
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,POST'"
+
+
+  AnswerQuestionApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ResourceId: !Ref APIGatewayResourceAnswers
+      HttpMethod: POST
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.header.Content-Type: true
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+            method.response.header.Access-Control-Allow-Methods: "'OPTIONS,POST'"
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AnswerQuestionFunction.Arn}/invocations
+        RequestParameters:
+          integration.request.header.Content-Type: "method.request.header.Content-Type"
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,POST'"
+    DependsOn: AnswerQuestionFunction
+
+
+  
+  GetAllQuestionsApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ResourceId: !Ref APIGatewayResourceGetAllQuestions
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetAllQuestionsFunction.Arn}/invocations
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET'"
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+            method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET'"
+
+  DeleteQuestionApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ResourceId: !Ref APIGatewayResourceQuestionId
+      HttpMethod: DELETE
+      AuthorizationType: NONE
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+            method.response.header.Access-Control-Allow-Methods: "'OPTIONS,DELETE'"
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeleteQuestionFunction.Arn}/invocations
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,DELETE'"
+
+
+  
+  OptionsMethodQuestions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      RestApiId: !Ref APIGatewayRestApi
+      ResourceId: !Ref APIGatewayResourceQuestions
+      HttpMethod: OPTIONS
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+            method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{ "statusCode": 200 }'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+            
+  OptionsMethodAnswers:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      RestApiId: !Ref APIGatewayRestApi
+      ResourceId: !Ref APIGatewayResourceAnswers
+      HttpMethod: OPTIONS
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+            method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{ "statusCode": 200 }'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+
+  # CORS Options Method for GetAllQuestions
+  OptionsMethodGetAllQuestions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      RestApiId: !Ref APIGatewayRestApi
+      ResourceId: !Ref APIGatewayResourceGetAllQuestions
+      HttpMethod: OPTIONS
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+            method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{ "statusCode": 200 }'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+
+  OptionsMethodDeleteQuestion:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ResourceId: !Ref APIGatewayResourceQuestionId
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+            method.response.header.Access-Control-Allow-Methods: "'DELETE,OPTIONS'"
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{ "statusCode": 200 }'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'DELETE,OPTIONS'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+
+
+
+  GetAllQuestionsPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt GetAllQuestionsFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${APIGatewayRestApi}/*"
+
+  PostQuestionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt PostQuestionFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${APIGatewayRestApi}/*"
+
+  AnswerQuestionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt AnswerQuestionFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${APIGatewayRestApi}/*"
+
+
+  DeleteQuestionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt DeleteQuestionFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${APIGatewayRestApi}/*"
+
+
+
+  APIGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      StageName: !Ref StageName
+    DependsOn:
+      - PostQuestionApiMethod
+      - AnswerQuestionApiMethod
+      - GetAllQuestionsApiMethod
+      - DeleteQuestionApiMethod
+      - OptionsMethodQuestions
+      - OptionsMethodAnswers
+      - OptionsMethodGetAllQuestions
+      - OptionsMethodDeleteQuestion
+
+Outputs:
+  ApiGatewayInvokeURL:
+    Description: URL for invoking the API Gateway
+    Value: !Sub https://${APIGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/
+  DeleteTest:
+    Description: Delete Test
+    Value: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeleteQuestionFunction.Arn}/invocations
+  GetTest:
+    Description: Delete Test
+    Value: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetAllQuestionsFunction.Arn}/invocations
